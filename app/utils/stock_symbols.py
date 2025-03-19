@@ -38,7 +38,8 @@ def get_stock_symbols(market, force_update=False):
         
         if file_mtime.date() == today:
             logger.info(f"{market} 종목 코드를 파일에서 로드합니다: {file_path}")
-            return pd.read_csv(file_path)
+            # dtype={'stock_code': str}로 종목코드를 문자열로 읽기
+            return pd.read_csv(file_path, dtype={'stock_code': str})
     
     # 파일이 없거나 강제 업데이트면 FinanceDataReader에서 종목 정보 가져오기
     logger.info(f"{market} 종목 코드를 FinanceDataReader에서 가져옵니다.")
@@ -127,8 +128,8 @@ def get_stock_symbols(market, force_update=False):
         # 시장 정보 추가
         df['market'] = market
         
-        # 파일로 저장
-        df.to_csv(file_path, index=False, encoding='utf-8-sig')
+        # 파일로 저장 - 종목코드를 문자열로 명시적 지정
+        df.to_csv(file_path, index=False, encoding='utf-8-sig', quoting=1)  # quoting=1은 모든 비숫자 필드를 따옴표로 묶음
         logger.info(f"{market} 종목 코드를 파일에 저장했습니다: {file_path} (총 {len(df)}개 종목)")
         
         return df
@@ -139,7 +140,8 @@ def get_stock_symbols(market, force_update=False):
         # 파일이 있으면 파일에서 로드
         if file_path.exists():
             logger.warning(f"기존 파일에서 {market} 종목 코드를 로드합니다: {file_path}")
-            return pd.read_csv(file_path)
+            # dtype={'stock_code': str}로 종목코드를 문자열로 읽기
+            return pd.read_csv(file_path, dtype={'stock_code': str})
         
         # 빈 DataFrame 반환
         logger.warning(f"빈 {market} 종목 코드 목록을 반환합니다.")

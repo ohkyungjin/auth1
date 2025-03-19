@@ -30,6 +30,7 @@
     {
       "parameters": {
         "url": "http://localhost:8000/api/symbols/update",
+        "method": "POST",
         "options": {
           "fullResponse": true
         }
@@ -46,6 +47,7 @@
     {
       "parameters": {
         "url": "http://localhost:8000/api/collect/today",
+        "method": "POST",
         "options": {
           "fullResponse": true
         }
@@ -62,10 +64,11 @@
     {
       "parameters": {
         "conditions": {
-          "boolean": [
+          "string": [
             {
-              "value1": "={{ $json.status_code }}",
-              "value2": 200
+              "value1": "={{ $json.status_code.toString() }}",
+              "value2": "200",
+              "operation": "equals"
             }
           ]
         }
@@ -127,7 +130,7 @@
     },
     {
       "parameters": {
-        "functionCode": "// 평일(월-금)인지 확인\nconst dateObject = new Date();\nconst dayOfWeek = dateObject.getDay(); // 0:일 ~ 6:토\n\n// 주말(0:일, 6:토)이 아닌 경우만 실행\nreturn dayOfWeek !== 0 && dayOfWeek !== 6;"
+        "functionCode": "// 평일(월-금)인지 확인 - 개선된 버전\nconst dateObject = new Date();\nconst dayOfWeek = dateObject.getDay(); // 0:일 ~ 6:토\nconst isoDate = dateObject.toISOString();\nconst koreanDate = new Date(dateObject.getTime() + (9 * 60 * 60 * 1000)).toISOString(); // UTC+9 시간으로 변환\n\n// 요일 이름 (디버깅용)\nconst dayNames = ['일요일', '월요일', '화요일', '수요일', '목요일', '금요일', '토요일'];\nconst dayName = dayNames[dayOfWeek];\n\n// 주말(0:일, 6:토)이 아닌 경우 확인\nconst isWeekday = (dayOfWeek >= 1 && dayOfWeek <= 5);\n\n// 디버깅 정보 생성\nconst debugInfo = {\n  currentDate: isoDate,\n  koreanDate: koreanDate,\n  dayOfWeek: dayOfWeek,\n  dayName: dayName,\n  isWeekday: isWeekday\n};\n\n// n8n에서 Function 노드는 items 배열을 반환해야 함\nreturn items.map(item => {\n  const newItem = JSON.parse(JSON.stringify(item));\n  newItem.json = newItem.json || {};\n  newItem.json.data = isWeekday;\n  newItem.json.debug = debugInfo;\n  return newItem;\n});"
       },
       "id": "a9c50c9c-2b9a-4b59-b4ee-ddea9b23d7c1",
       "name": "평일 확인",
@@ -143,7 +146,9 @@
         "conditions": {
           "boolean": [
             {
-              "value1": "={{ $json.data }}"
+              "value1": "={{ $json.data }}",
+              "value2": true,
+              "operation": "equals"
             }
           ]
         }
@@ -160,6 +165,7 @@
     {
       "parameters": {
         "url": "http://localhost:8000/api/merge",
+        "method": "POST",
         "options": {
           "fullResponse": true
         }
@@ -176,7 +182,7 @@
     {
       "parameters": {
         "chatId": "{{ $env.TELEGRAM_CHAT_ID }}",
-        "text": "📊 주식 데이터가 오늘 수집되지 않았습니다.\n\n이유: 오늘은 주말입니다.",
+        "text": "📊 주식 데이터가 오늘 수집되지 않습니다.\n\n이유: 평일 검사 결과가 false입니다.\n\n[디버깅 정보]\n날짜(UTC): {{ $json.debug.currentDate }}\n날짜(한국): {{ $json.debug.koreanDate }}\n요일: {{ $json.debug.dayName }} ({{ $json.debug.dayOfWeek }})\n평일 여부: {{ $json.debug.isWeekday }}",
         "additionalFields": {
           "parse_mode": "HTML"
         }
@@ -211,6 +217,94 @@
       "position": [
         1450,
         200
+      ],
+      "credentials": {
+        "telegramApi": {
+          "id": "1",
+          "name": "Telegram account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "boolean": [
+            {
+              "value1": "={{ $json.body.status }}",
+              "value2": "success",
+              "operation": "equals"
+            }
+          ]
+        }
+      },
+      "id": "symbol-update-check",
+      "name": "종목 코드 업데이트 확인",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 1,
+      "position": [
+        550,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "chatId": "{{ $env.TELEGRAM_CHAT_ID }}",
+        "text": "❌ 종목 코드 업데이트 실패\n\n상태: {{ $json.body.status || 'unknown' }}\n오류 내용: {{ $json.body.detail || $json.body.message || $json.statusMessage || '알 수 없는 오류' }}",
+        "additionalFields": {
+          "parse_mode": "HTML"
+        }
+      },
+      "id": "symbol-update-error",
+      "name": "종목 코드 업데이트 실패 알림",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1,
+      "position": [
+        650,
+        450
+      ],
+      "credentials": {
+        "telegramApi": {
+          "id": "1",
+          "name": "Telegram account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "string": [
+            {
+              "value1": "={{ $json.body.status }}",
+              "value2": "success",
+              "operation": "equals"
+            }
+          ]
+        }
+      },
+      "id": "merge-check",
+      "name": "병합 결과 확인",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 1,
+      "position": [
+        1350,
+        200
+      ]
+    },
+    {
+      "parameters": {
+        "chatId": "{{ $env.TELEGRAM_CHAT_ID }}",
+        "text": "⚠️ 데이터 병합 경고: {{ $json.body.message }}",
+        "additionalFields": {
+          "parse_mode": "HTML"
+        }
+      },
+      "id": "merge-warning",
+      "name": "병합 경고 알림",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1,
+      "position": [
+        1450,
+        350
       ],
       "credentials": {
         "telegramApi": {
@@ -276,7 +370,7 @@
       "main": [
         [
           {
-            "node": "병합 완료 알림",
+            "node": "병합 결과 확인",
             "type": "main",
             "index": 0
           }
@@ -316,7 +410,43 @@
       "main": [
         [
           {
+            "node": "종목 코드 업데이트 확인",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "종목 코드 업데이트 확인": {
+      "main": [
+        [
+          {
             "node": "오늘 데이터 수집",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "종목 코드 업데이트 실패 알림",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "병합 결과 확인": {
+      "main": [
+        [
+          {
+            "node": "병합 완료 알림",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "병합 경고 알림",
             "type": "main",
             "index": 0
           }
