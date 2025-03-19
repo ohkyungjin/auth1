@@ -1,0 +1,327 @@
+{
+  "name": "한국 주식 OHLCV 데이터 수집",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "hours",
+              "minutesAndSeconds": {
+                "minute": 0,
+                "second": 0
+              },
+              "triggerAtHour": [
+                18
+              ]
+            }
+          ]
+        }
+      },
+      "id": "3a36e9f9-22df-4cc0-97c7-c923bd8ccc4e",
+      "name": "Schedule Trigger",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1,
+      "position": [
+        250,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "url": "http://localhost:8000/api/symbols/update",
+        "options": {
+          "fullResponse": true
+        }
+      },
+      "id": "7c5e1d8a-1b34-4f69-9d83-a2c65f8ab123",
+      "name": "종목 코드 업데이트",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 3,
+      "position": [
+        450,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "url": "http://localhost:8000/api/collect/today",
+        "options": {
+          "fullResponse": true
+        }
+      },
+      "id": "cf4df3e3-e0e4-4c6e-8a82-d9ca4fb9f3d1",
+      "name": "오늘 데이터 수집",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 3,
+      "position": [
+        650,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "boolean": [
+            {
+              "value1": "={{ $json.status_code }}",
+              "value2": 200
+            }
+          ]
+        }
+      },
+      "id": "5bc82e85-4e8e-4baa-9b56-a9a4e4e1eddd",
+      "name": "IF",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 1,
+      "position": [
+        850,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "chatId": "{{ $env.TELEGRAM_CHAT_ID }}",
+        "text": "✅ 주식 데이터 수집 작업이 시작되었습니다.\n\n{{ $json.body.message }}",
+        "additionalFields": {
+          "parse_mode": "HTML"
+        }
+      },
+      "id": "59d9f9b6-1f85-4b94-a81c-7b2d1e69d2f4",
+      "name": "성공 메시지 전송",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1,
+      "position": [
+        1050,
+        200
+      ],
+      "credentials": {
+        "telegramApi": {
+          "id": "1",
+          "name": "Telegram account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "chatId": "{{ $env.TELEGRAM_CHAT_ID }}",
+        "text": "❌ 주식 데이터 수집 작업이 실패했습니다.\n\n오류 코드: {{ $json.status_code }}\n오류 내용: {{ $json.statusMessage }}",
+        "additionalFields": {
+          "parse_mode": "HTML"
+        }
+      },
+      "id": "06dbb1b1-93e8-4e7a-a0a9-b11c4607d1e4",
+      "name": "실패 메시지 전송",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1,
+      "position": [
+        1050,
+        400
+      ],
+      "credentials": {
+        "telegramApi": {
+          "id": "1",
+          "name": "Telegram account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "functionCode": "// 평일(월-금)인지 확인\nconst dateObject = new Date();\nconst dayOfWeek = dateObject.getDay(); // 0:일 ~ 6:토\n\n// 주말(0:일, 6:토)이 아닌 경우만 실행\nreturn dayOfWeek !== 0 && dayOfWeek !== 6;"
+      },
+      "id": "a9c50c9c-2b9a-4b59-b4ee-ddea9b23d7c1",
+      "name": "평일 확인",
+      "type": "n8n-nodes-base.function",
+      "typeVersion": 1,
+      "position": [
+        350,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "boolean": [
+            {
+              "value1": "={{ $json.data }}"
+            }
+          ]
+        }
+      },
+      "id": "a3eba7c4-5a5e-4fcd-aead-f84d9a1cf8ac",
+      "name": "IF1",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 1,
+      "position": [
+        450,
+        100
+      ]
+    },
+    {
+      "parameters": {
+        "url": "http://localhost:8000/api/merge",
+        "options": {
+          "fullResponse": true
+        }
+      },
+      "id": "f9c2dc3a-e4c7-4a29-bc98-eb6a13eec8f4",
+      "name": "데이터 병합 요청",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 3,
+      "position": [
+        1250,
+        200
+      ]
+    },
+    {
+      "parameters": {
+        "chatId": "{{ $env.TELEGRAM_CHAT_ID }}",
+        "text": "📊 주식 데이터가 오늘 수집되지 않았습니다.\n\n이유: 오늘은 주말입니다.",
+        "additionalFields": {
+          "parse_mode": "HTML"
+        }
+      },
+      "id": "c3b9b2ac-db5d-4e0a-9b8e-65ac9a0afbec",
+      "name": "주말 알림 전송",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1,
+      "position": [
+        650,
+        100
+      ],
+      "credentials": {
+        "telegramApi": {
+          "id": "1",
+          "name": "Telegram account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "chatId": "{{ $env.TELEGRAM_CHAT_ID }}",
+        "text": "📊 데이터 병합 완료: {{ $json.body.message }}",
+        "additionalFields": {
+          "parse_mode": "HTML"
+        }
+      },
+      "id": "d5b9c3e7-2a98-4bd1-b7fa-3c76d8e94a12",
+      "name": "병합 완료 알림",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1,
+      "position": [
+        1450,
+        200
+      ],
+      "credentials": {
+        "telegramApi": {
+          "id": "1",
+          "name": "Telegram account"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Schedule Trigger": {
+      "main": [
+        [
+          {
+            "node": "평일 확인",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "오늘 데이터 수집": {
+      "main": [
+        [
+          {
+            "node": "IF",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "IF": {
+      "main": [
+        [
+          {
+            "node": "성공 메시지 전송",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "실패 메시지 전송",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "성공 메시지 전송": {
+      "main": [
+        [
+          {
+            "node": "데이터 병합 요청",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "데이터 병합 요청": {
+      "main": [
+        [
+          {
+            "node": "병합 완료 알림",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "평일 확인": {
+      "main": [
+        [
+          {
+            "node": "IF1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "IF1": {
+      "main": [
+        [
+          {
+            "node": "종목 코드 업데이트",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "주말 알림 전송",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "종목 코드 업데이트": {
+      "main": [
+        [
+          {
+            "node": "오늘 데이터 수집",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  }
+}
