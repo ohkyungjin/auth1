@@ -124,13 +124,13 @@ class KoreaInvestmentAPI:
         # 1. 기존 토큰이 유효한 경우 재사용
         if KoreaInvestmentAPI._access_token and KoreaInvestmentAPI._token_expired_at and datetime.now() < KoreaInvestmentAPI._token_expired_at:
             return KoreaInvestmentAPI._access_token
-        
+            
         # 2. 토큰 발급 (스레드 안전하게)
         with KoreaInvestmentAPI._token_lock:
             # 락 획득 후 한번 더 체크 (다른 스레드가 갱신했을 수 있음)
             if KoreaInvestmentAPI._access_token and KoreaInvestmentAPI._token_expired_at and datetime.now() < KoreaInvestmentAPI._token_expired_at:
                 return KoreaInvestmentAPI._access_token
-            
+                
             logger.info("한국투자증권 API 토큰 발급 요청")
             
             # 3. API 호출로 새 토큰 발급
@@ -144,11 +144,11 @@ class KoreaInvestmentAPI:
                 }
                 
                 response = requests.post(url, headers=headers, json=body, timeout=10)
-                
+                    
                 if response.status_code != 200:
                     logger.error(f"토큰 발급 실패: {response.status_code} - {response.text}")
                     return KoreaInvestmentAPI._access_token  # 기존 토큰 반환 (있다면)
-                
+            
                 result = response.json()
                 KoreaInvestmentAPI._access_token = result.get("access_token")
                 expires_in = result.get("expires_in", 86400)  # 기본값 24시간
