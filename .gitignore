@@ -25,4 +25,4 @@ logs/
 *.log.*.*.*
 *.log.*.*.*.*
 
-token_cache.json
+C:\Dev\project\auth1\app\services\token_cache.json
